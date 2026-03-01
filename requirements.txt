@@ -1,0 +1,7 @@
+datasets
+Pillow
+opencv-python
+pandas
+torch
+torchvision
+tqdm
