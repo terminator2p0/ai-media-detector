@@ -1,0 +1,14 @@
+{"time":"2026-03-02T14:23:48.141245-05:00","level":"INFO","msg":"stream: starting","core version":"0.25.0"}
+{"time":"2026-03-02T14:23:48.37821-05:00","level":"INFO","msg":"stream: created new stream","id":"y3vmiiin"}
+{"time":"2026-03-02T14:23:48.378437-05:00","level":"INFO","msg":"handler: started","stream_id":"y3vmiiin"}
+{"time":"2026-03-02T14:23:48.378587-05:00","level":"INFO","msg":"writer: started","stream_id":"y3vmiiin"}
+{"time":"2026-03-02T14:23:48.378842-05:00","level":"INFO","msg":"stream: started","id":"y3vmiiin"}
+{"time":"2026-03-02T14:23:48.378948-05:00","level":"INFO","msg":"sender: started","stream_id":"y3vmiiin"}
+{"time":"2026-03-02T14:42:37.000815-05:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/files/parimisettiabhi3581-parallon/ai-media-detector/y3vmiiin/file_stream\": read tcp 192.168.1.130:50138->35.186.228.49:443: read: operation timed out"}
+{"time":"2026-03-02T15:02:05.262143-05:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/files/parimisettiabhi3581-parallon/ai-media-detector/y3vmiiin/file_stream\": read tcp 192.168.1.130:50444->35.186.228.49:443: read: operation timed out"}
+{"time":"2026-03-02T15:49:04.881943-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2026-03-02T15:49:05.140323-05:00","level":"INFO","msg":"handler: operation stats","stats":{}}
+{"time":"2026-03-02T15:49:05.146161-05:00","level":"INFO","msg":"stream: closing","id":"y3vmiiin"}
+{"time":"2026-03-02T15:49:05.146462-05:00","level":"INFO","msg":"handler: closed","stream_id":"y3vmiiin"}
+{"time":"2026-03-02T15:49:05.146532-05:00","level":"INFO","msg":"sender: closed","stream_id":"y3vmiiin"}
+{"time":"2026-03-02T15:49:05.146543-05:00","level":"INFO","msg":"stream: closed","id":"y3vmiiin"}
