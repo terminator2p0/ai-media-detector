@@ -7,3 +7,6 @@ torchvision
 tqdm
 wandb
 pyyaml
+scikit-learn 
+matplotlib 
+seaborn
