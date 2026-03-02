@@ -1,0 +1,9 @@
+Training on device: mps
+Loading base model previously trained on CIFAKE...
+Starting Video Fine-Tuning Loop...
+Epoch 1/5 [Train]: 100%|█████████████████████████████████████████████████████| 1735/1735 [17:15<00:00,  1.68it/s, acc=0.764, loss=0.213]
+Epoch 2/5 [Train]: 100%|█████████████████████████████████████████████████████| 1735/1735 [17:01<00:00,  1.70it/s, acc=0.878, loss=0.141]
+Epoch 3/5 [Train]: 100%|██████████████████████████████████████████████████████| 1735/1735 [17:04<00:00,  1.69it/s, acc=0.92, loss=0.191]
+Epoch 4/5 [Train]: 100%|████████████████████████████████████████████████████| 1735/1735 [16:59<00:00,  1.70it/s, acc=0.941, loss=0.0649]
+Epoch 5/5 [Train]: 100%|█████████████████████████████████████████████████████| 1735/1735 [16:54<00:00,  1.71it/s, acc=0.954, loss=0.113]
+Video training complete. Model saved to models/checkpoints/efficientnet_b4_video_final.pth

@@ -1,0 +1,36 @@
+{
+  "os": "macOS-26.3-arm64-arm-64bit-Mach-O",
+  "python": "CPython 3.13.5",
+  "startedAt": "2026-03-02T19:23:47.837312Z",
+  "program": "/Users/abhi/ai-media-detector/models/train_video.py",
+  "codePath": "models/train_video.py",
+  "codePathLocal": "models/train_video.py",
+  "git": {
+    "remote": "https://github.com/terminator2p0/ai-media-detector.git",
+    "commit": "c3646c4b67db2b88f308d0e8ac6e86c7ff6cdb85"
+  },
+  "email": "parimisettiabhi3581@gmail.com",
+  "root": "/Users/abhi/ai-media-detector",
+  "host": "Mac.home.local",
+  "executable": "/Users/abhi/ai-media-detector/venv/bin/python",
+  "cpu_count": 12,
+  "cpu_count_logical": 12,
+  "disk": {
+    "/": {
+      "total": "494384795648",
+      "used": "344462721024"
+    }
+  },
+  "memory": {
+    "total": "25769803776"
+  },
+  "apple": {
+    "name": "Apple M4 Pro",
+    "ecpuCores": 4,
+    "pcpuCores": 8,
+    "gpuCores": 16,
+    "memoryGb": 24,
+    "ramTotalBytes": "25769803776"
+  },
+  "writerId": "a58uedgtkfuqdt30lzifhjs1qewf1q6k"
+}
