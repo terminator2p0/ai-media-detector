@@ -5,3 +5,5 @@ pandas
 torch
 torchvision
 tqdm
+wandb
+pyyaml
