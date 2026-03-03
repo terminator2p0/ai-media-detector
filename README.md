@@ -2,9 +2,10 @@
 
 A production-ready deepfake detection suite designed to identify AI-generated artifacts across **Video, Image, Audio, and Text**. This project features a **Self-Supervised Feedback Loop**, allowing the system to ingest human corrections, deduplicate data via MD5 hashing, and retrain its neural engines locally.
 
-
+---
 
 ## 🚀 Core Features
+
 * **Video & Image Analysis:** Powered by **EfficientNet-B4** for spatial artifact detection.
 * **Audio Analysis:** Utilizes **Wav2Vec2-base** to identify synthetic acoustic patterns.
 * **Textual Analysis:** Employs a **RoBERTa-based** transformer (TMR-RoBERTa) to detect LLM-generated text.
@@ -29,12 +30,17 @@ ai-media-detector/
 │   ├── inference_orchestrator.py # Multi-modal model manager
 │   └── checkpoints/           # Model weight storage (.pth files)
 └── .env.example               # Template for environment secrets
+```
 
-🛠️ Setup Instructions
-1. Environment Setup
-Bash
+---
+
+## 🛠️ Setup Instructions
+
+### 1. Environment Setup
+
+```bash
 # Clone the repository
-git clone [https://github.com/terminator2p0/ai-media-detector.git](https://github.com/terminator2p0/ai-media-detector.git)
+git clone https://github.com/terminator2p0/ai-media-detector.git
 cd ai-media-detector
 
 # Create and activate virtual environment
@@ -43,40 +49,51 @@ source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
-2. Model Checkpoints
-Place your trained weights in models/checkpoints/:
+```
 
-efficientnet_b4_video_final.pth
+### 2. Model Checkpoints
 
-wav2vec2_audio_final.pth
+Place your trained weights in `models/checkpoints/`:
 
-🖥️ How to Use
-1. Launch the Dashboard
-Bash
+* `efficientnet_b4_video_final.pth`
+* `wav2vec2_audio_final.pth`
+
+---
+
+## 🖥️ How to Use
+
+### 1. Launch the Dashboard
+
+```bash
 streamlit run app.py
-2. The Feedback Loop (Active Learning)
-Run a Scan: Upload a suspect file and click "Run Neural Scan".
+```
 
-Audit Result: If the model makes a mistake, click "❌ No, Incorrect".
+### 2. The Feedback Loop (Active Learning)
 
-Deduplication: The system calculates an MD5 Hash to prevent duplicate storage.
+* **Run a Scan:** Upload a suspect file and click "Run Neural Scan".
+* **Audit Result:** If the model makes a mistake, click "❌ No, Incorrect".
+* **Deduplication:** The system calculates an MD5 Hash to prevent duplicate storage.
+* **Refine the Agent:** Once you have a batch of errors, close the app and run:
 
-Refine the Agent: Once you have a batch of errors, close the app and run:
-
-Bash
+```bash
 python train_feedback.py
+```
+
 This creates a model backup, fine-tunes the weights, and archives the training data.
 
-⚙️ Technical Specifications
-Deduplication: Content-based hashing ensures training data integrity.
+---
 
-Refinement: Uses BCEWithLogitsLoss with a 1e-6 learning rate to prevent "Catastrophic Forgetting."
+## ⚙️ Technical Specifications
 
-Hardware: Optimized for Mac M-series (MPS) and standard CUDA GPUs.
+* **Deduplication:** Content-based hashing ensures training data integrity.
+* **Refinement:** Uses `BCEWithLogitsLoss` with a `1e-6` learning rate to prevent "Catastrophic Forgetting."
+* **Hardware:** Optimized for Mac M-series (MPS).
 
-👤 Author
-Abhi Parimisetti
+---
 
-Data Engineer at Parallon
+## 👤 Author
 
-GitHub: @terminator2p0
+**Abhi Parimisetti**
+
+* Data Engineer at Parallon
+* GitHub: [@terminator2p0](https://github.com/terminator2p0)
