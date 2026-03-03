@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+import streamlit as st
 
 # Standard LangChain v1.0 Imports
 from langchain.agents import create_agent
@@ -10,9 +11,17 @@ from langchain.tools import tool
 from models.inference_orchestrator import MediaForensicsOrchestrator
 
 load_dotenv()
+# Initialize the engine once
 orchestrator = MediaForensicsOrchestrator()
 
-# --- 1. TOOLS ---
+# --- 1. SECURE KEY RETRIEVAL ---
+# Check Streamlit secrets first (Cloud), then fall back to os.environ (Local)
+if "GOOGLE_API_KEY" in st.secrets:
+    google_api_key = st.secrets["GOOGLE_API_KEY"]
+else:
+    google_api_key = os.getenv("GOOGLE_API_KEY")
+
+# --- 2. TOOLS ---
 @tool
 def analyze_image(file_path: str):
     """Analyzes an image file (JPG/PNG) for deepfakes."""
@@ -35,15 +44,16 @@ def analyze_video(file_path: str):
 
 tools = [analyze_image, analyze_text, analyze_audio, analyze_video]
 
-# --- 2. THE BRAIN (Gemini 1.5 Pro) ---
+# --- 3. THE BRAIN (Gemini 2.5 Flash) ---
+# Pass the retrieved google_api_key directly to the model
 model = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash", 
+    google_api_key=google_api_key,
     temperature=0,
     convert_system_message_to_human=True 
 )
 
-# --- 3. CREATE THE AGENT (v1.0 Syntax) ---
-# In 2026, 'system_prompt' is the standard keyword
+# --- 4. CREATE THE AGENT (v1.0 Syntax) ---
 agent = create_agent(
     model=model,
     tools=tools,
@@ -53,17 +63,15 @@ agent = create_agent(
     )
 )
 
-# --- 4. RUN ---
+# --- 5. RUN ---
 if __name__ == "__main__":
     query = (
         "I found this text in a suspect email: 'Leverage our synergistic deep-learning paradigms.' "
         "Also, check the voice memo at 'data/raw/audio/test_audio.wav'."
     )
     
-    # LangChain v1.0 uses the standardized input dict
-    # The 'create_agent' runtime handles the loop and formatting automatically
+    # LangChain v1.0 standardized input dict
     response = agent.invoke({"messages": [{"role": "user", "content": query}]})
     
-    # The result is returned in a standard content block
     print("\n--- 📜 FINAL FORENSIC REPORT ---")
     print(response["messages"][-1].content)
