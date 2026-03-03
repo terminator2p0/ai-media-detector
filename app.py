@@ -7,6 +7,7 @@ import hashlib
 from datetime import datetime
 from models.inference_orchestrator import MediaForensicsOrchestrator
 
+
 # --- PAGE CONFIG ---
 st.set_page_config(
     page_title="Forensic AI Detector", 
