@@ -79,7 +79,7 @@ if uploaded_file is not None:
         if file_type == 'video':
             st.video(uploaded_file)
         elif file_type == 'image':
-            st.image(uploaded_file, use_container_width=True)
+            st.image(uploaded_file, width="stretch")
         elif file_type == 'audio':
             st.audio(uploaded_file)
 
