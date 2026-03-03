@@ -1,0 +1,19 @@
+[theme]
+# A deep charcoal background (Standard for dark mode)
+backgroundColor = "#0E1117"
+
+# A slightly lighter gray for cards and widgets
+secondaryBackgroundColor = "#262730"
+
+# High-contrast white for readability
+textColor = "#FAFAFA"
+
+# "Terminal Green" for primary buttons and accents
+primaryColor = "#00FF41"
+
+# Clean monospace font for that technical feel
+font = "monospace"
+
+[server]
+# This ensures Streamlit picks up changes immediately
+runOnSave = true
