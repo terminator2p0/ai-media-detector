@@ -1,38 +1,40 @@
-🛡️ Multi-Modal Forensic AI Investigator
-A production-ready deepfake detection suite designed to identify AI-generated artifacts across Video, Image, Audio, and Text. This project features a Self-Supervised Feedback Loop, allowing the system to ingest human corrections, deduplicate data via MD5 hashing, and retrain its neural engines locally.
+# 🛡️ Multi-Modal Forensic AI Investigator
 
-🚀 Core Features
-Video & Image Analysis: Powered by EfficientNet-B4 for spatial artifact detection.
+A production-ready deepfake detection suite designed to identify AI-generated artifacts across **Video, Image, Audio, and Text**. This project features a **Self-Supervised Feedback Loop**, allowing the system to ingest human corrections, deduplicate data via MD5 hashing, and retrain its neural engines locally.
 
-Audio Analysis: Utilizes Wav2Vec2-base to identify synthetic acoustic patterns.
 
-Textual Analysis: Employs a RoBERTa-based transformer (TMR-RoBERTa) to detect LLM-generated text.
 
-Self-Supervised Learning: Integrated UI buttons to flag errors, which are then used for local model refinement.
+## 🚀 Core Features
+* **Video & Image Analysis:** Powered by **EfficientNet-B4** for spatial artifact detection.
+* **Audio Analysis:** Utilizes **Wav2Vec2-base** to identify synthetic acoustic patterns.
+* **Textual Analysis:** Employs a **RoBERTa-based** transformer (TMR-RoBERTa) to detect LLM-generated text.
+* **Self-Supervised Learning:** Integrated UI to flag errors, which are then used for local model refinement.
+* **Hardware Optimized:** Native support for **Apple Silicon (MPS)** and NVIDIA (CUDA).
 
-Hardware Optimized: Native support for Apple Silicon (MPS) and NVIDIA (CUDA) for high-speed inference.
+---
 
-📂 Repository Structure
-Based on the current project directory:
+## 📂 Repository Structure
 
-Plaintext
+```text
 ai-media-detector/
 ├── app.py                     # Streamlit Dashboard & Forensic UI
 ├── train_feedback.py          # Self-supervised retraining engine
 ├── requirements.txt           # Project dependencies
 ├── agent/                     # Forensic reasoning logic
 ├── configs/                   # Global app & model configurations
-├── data/                      # Feedback loop, archives, and processed media
+├── data/                      # Data storage
+│   ├── feedback_loop/         # Active training samples (Real/Fake)
+│   └── archive/               # Processed training samples
 ├── models/                    
 │   ├── inference_orchestrator.py # Multi-modal model manager
 │   └── checkpoints/           # Model weight storage (.pth files)
-├── wandb/                     # Weights & Biases experiment tracking
 └── .env.example               # Template for environment secrets
+
 🛠️ Setup Instructions
 1. Environment Setup
 Bash
 # Clone the repository
-git clone https://github.com/your-username/ai-media-detector.git
+git clone [https://github.com/terminator2p0/ai-media-detector.git](https://github.com/terminator2p0/ai-media-detector.git)
 cd ai-media-detector
 
 # Create and activate virtual environment
@@ -42,7 +44,7 @@ source venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 2. Model Checkpoints
-Ensure your trained weights are placed in models/checkpoints/:
+Place your trained weights in models/checkpoints/:
 
 efficientnet_b4_video_final.pth
 
@@ -57,21 +59,24 @@ Run a Scan: Upload a suspect file and click "Run Neural Scan".
 
 Audit Result: If the model makes a mistake, click "❌ No, Incorrect".
 
-Deduplication: The system automatically calculates the file's MD5 Hash. If the file already exists in the feedback loop, it skips it to save space and maintain training integrity.
+Deduplication: The system calculates an MD5 Hash to prevent duplicate storage.
 
-Refine the Agent: Once you have collected a batch of errors, run the retraining script:
+Refine the Agent: Once you have a batch of errors, close the app and run:
 
 Bash
 python train_feedback.py
-This script creates a backup of your current model.
-
-It fine-tunes the model on the new "hard cases" using a micro-learning rate.
-
-It archives the training data to keep the feedback loop clean.
+This creates a model backup, fine-tunes the weights, and archives the training data.
 
 ⚙️ Technical Specifications
-Deduplication: Content-based hashing ensures training data remains distinct regardless of filename changes.
+Deduplication: Content-based hashing ensures training data integrity.
 
-Precision Refinement: Uses BCEWithLogitsLoss with a 1e-6 learning rate to prevent "Catastrophic Forgetting" during refinement sessions.
+Refinement: Uses BCEWithLogitsLoss with a 1e-6 learning rate to prevent "Catastrophic Forgetting."
 
-Frameworks: PyTorch, Streamlit, Hugging Face Transformers, OpenCV, Librosa
+Hardware: Optimized for Mac M-series (MPS) and standard CUDA GPUs.
+
+👤 Author
+Abhi Parimisetti
+
+Data Engineer at Parallon
+
+GitHub: @terminator2p0
