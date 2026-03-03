@@ -48,7 +48,6 @@ class MediaForensicsOrchestrator:
         return self.text_detector.predict(text)
 
     def scan_audio(self, path):
-        # Safety check for file existence
         if not os.path.exists(path):
             return f"Error: File not found at {path}"
             
@@ -61,42 +60,48 @@ class MediaForensicsOrchestrator:
             return {"prediction": "AI-Generated" if prob > 0.5 else "Authentic", "confidence": round(prob * 100, 2)}
         except Exception as e:
             return f"Error processing audio: {str(e)}"
-        
-def scan_video(self, path, sample_rate=1.0):
-    """Extracts frames from a video and runs the EfficientNet detector."""
-    if not os.path.exists(path):
-        return f"Error: Video file {path} not found."
 
-    cap = cv2.VideoCapture(path)
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    frame_count = 0
-    scores = []
+    def scan_video(self, path, sample_rate=1.0):
+        """Extracts frames from a video and runs the EfficientNet detector."""
+        if not os.path.exists(path):
+            return f"Error: Video file {path} not found."
 
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
+        cap = cv2.VideoCapture(path)
+        fps = cap.get(cv2.CAP_PROP_FPS)
         
-        # Sample 1 frame per second to keep it fast
-        if frame_count % int(fps) == 0:
-            # Convert OpenCV BGR to PIL RGB
-            img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-            img_t = self.img_transform(img).unsqueeze(0).to(self.device)
+        # Safety: If FPS is 0 or invalid, default to 30
+        if fps <= 0:
+            fps = 30.0
             
-            with torch.no_grad():
-                output = self.visual_model(img_t)
-                prob = torch.sigmoid(output).item()
-                scores.append(prob)
+        frame_count = 0
+        scores = []
+
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+            
+            # Sample 1 frame per second (or custom sample_rate)
+            if frame_count % int(fps / sample_rate) == 0:
+                # Convert OpenCV BGR to PIL RGB
+                img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                img_t = self.img_transform(img).unsqueeze(0).to(self.device)
+                
+                with torch.no_grad():
+                    output = self.visual_model(img_t)
+                    prob = torch.sigmoid(output).item()
+                    scores.append(prob)
+            
+            frame_count += 1
         
-        frame_count += 1
-    cap.release()
+        cap.release()
 
-    if not scores:
-        return "Error: Could not extract frames from video."
+        if not scores:
+            return "Error: Could not extract frames from video."
 
-    avg_prob = sum(scores) / len(scores)
-    return {
-        "prediction": "AI-Generated/Deepfake" if avg_prob > 0.5 else "Authentic",
-        "avg_confidence": round(avg_prob * 100, 2),
-        "frames_analyzed": len(scores)
-    }
+        avg_prob = sum(scores) / len(scores)
+        return {
+            "prediction": "AI-Generated/Deepfake" if avg_prob > 0.5 else "Authentic",
+            "average_confidence": round(avg_prob * 100, 2),
+            "frames_analyzed": len(scores)
+        }
