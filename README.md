@@ -74,4 +74,4 @@ Deduplication: Content-based hashing ensures training data remains distinct rega
 
 Precision Refinement: Uses BCEWithLogitsLoss with a 1e-6 learning rate to prevent "Catastrophic Forgetting" during refinement sessions.
 
-Frameworks: PyTorch, Streamlit, Hugging Face Transformers, OpenCV, Librosa.
+Frameworks: PyTorch, Streamlit, Hugging Face Transformers, OpenCV, Librosa
