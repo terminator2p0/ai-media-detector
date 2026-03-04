@@ -1,55 +1,28 @@
 import torch
 import os
 import librosa
-import requests
 import cv2
-import re
+import gdown  # <--- NEW: The bulletproof Google Drive downloader
 from PIL import Image
 from torchvision import transforms
-from tqdm import tqdm
 from transformers import AutoModelForAudioClassification, AutoFeatureExtractor
 
-# Local Imports (Ensure these match your project structure)
+# Local Imports 
 from models.model import AIMediaDetector
 from models.text_detector import AITextDetector
 
-def get_confirm_token(response):
-    """Extracts the confirmation token from cookies or HTML for large files."""
-    for key, value in response.cookies.items():
-        if key.startswith('download_warning'):
-            return value
-    
-    match = re.search(r'confirm=([0-9A-Za-z-_]+)', response.text)
-    if match:
-        return match.group(1)
-    
-    return None
-
 def download_from_gdrive(file_id, destination):
-    """Downloads large files from Google Drive bypassing the virus warning."""
-    base_url = "https://docs.google.com/uc?export=download"
-    session = requests.Session()
-    
-    # Initial request
-    response = session.get(base_url, params={'id': file_id}, stream=True)
-    token = get_confirm_token(response)
-
-    # Re-request if a confirmation token is required
-    if token:
-        params = {'id': file_id, 'confirm': token}
-        response = session.get(base_url, params=params, stream=True)
-    
-    # Save the file to disk with a progress bar
+    """
+    Uses gdown to securely bypass Google Drive's anti-bot and 
+    large-file warning screens.
+    """
     os.makedirs(os.path.dirname(destination), exist_ok=True)
-    with open(destination, "wb") as f, tqdm(
-        unit='B', 
-        unit_scale=True, 
-        desc=f"Downloading {os.path.basename(destination)}"
-    ) as bar:
-        for chunk in response.iter_content(chunk_size=32768):
-            if chunk:
-                f.write(chunk)
-                bar.update(len(chunk))
+    
+    # gdown automatically constructs the correct API URL and handles tokens
+    url = f"https://drive.google.com/uc?id={file_id}"
+    
+    # quiet=False ensures you see the actual MB progress bar in Streamlit logs
+    gdown.download(url, destination, quiet=False)
 
 class MediaForensicsOrchestrator:
     def __init__(self):
