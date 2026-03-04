@@ -17,7 +17,8 @@ def download_from_gdrive(file_id, destination):
     Downloads large files from Google Drive by handling the confirmation token 
     and bypassing the virus scan warning.
     """
-    URL = "https://drive.google.com/drive/folders/1DR6PuQyY8tzQnoiDxopU-kzYf3R2urlx?usp=sharing"
+    # CORRECT API ENDPOINT
+    URL = "https://docs.google.com/uc?export=download"
     session = requests.Session()
     
     # Initial request to retrieve the download warning token
@@ -31,6 +32,7 @@ def download_from_gdrive(file_id, destination):
     if token:
         response = session.get(URL, params={'id': file_id, 'confirm': token}, stream=True)
     else:
+        # Re-run the request if no token was needed (for smaller files)
         response = session.get(URL, params={'id': file_id}, stream=True)
 
     os.makedirs(os.path.dirname(destination), exist_ok=True)
@@ -77,7 +79,7 @@ class MediaForensicsOrchestrator:
 
         # 5. Load Visual Model
         self.visual_model = AIMediaDetector(pretrained=False)
-        self.visual_model.load_state_dict(torch.load(self.checkpoints["visual"]["path"], map_location=self.device))
+        self.visual_model.load_state_dict(torch.load(self.checkpoints["visual"]["path"], map_location=self.device,weights_only=False))
         self.visual_model.to(self.device).eval()
 
         # 6. Load Text Model
@@ -86,7 +88,7 @@ class MediaForensicsOrchestrator:
         # 7. Load Audio Model
         self.audio_extractor = AutoFeatureExtractor.from_pretrained("facebook/wav2vec2-base")
         self.audio_model = AutoModelForAudioClassification.from_pretrained("facebook/wav2vec2-base", num_labels=2)
-        self.audio_model.load_state_dict(torch.load(self.checkpoints["audio"]["path"], map_location=self.device))
+        self.audio_model.load_state_dict(torch.load(self.checkpoints["audio"]["path"], map_location=self.device, weights_only=False))
         self.audio_model.to(self.device).eval()
         
         print("--- All Forensic Engines Loaded ---")
