@@ -1,37 +1,92 @@
 import torch
 import os
 import librosa
+import requests
+import cv2
 from PIL import Image
 from torchvision import transforms
+from tqdm import tqdm
 from transformers import AutoModelForAudioClassification, AutoFeatureExtractor
+
+# Local Imports
 from models.model import AIMediaDetector
 from models.text_detector import AITextDetector
-import cv2
+
+def download_from_gdrive(file_id, destination):
+    """
+    Downloads large files from Google Drive by handling the confirmation token 
+    and bypassing the virus scan warning.
+    """
+    URL = "https://drive.google.com/drive/folders/1DR6PuQyY8tzQnoiDxopU-kzYf3R2urlx?usp=sharing"
+    session = requests.Session()
+    
+    # Initial request to retrieve the download warning token
+    response = session.get(URL, params={'id': file_id}, stream=True)
+    token = None
+    for key, value in response.cookies.items():
+        if key.startswith('download_warning'):
+            token = value
+            break
+
+    if token:
+        response = session.get(URL, params={'id': file_id, 'confirm': token}, stream=True)
+    else:
+        response = session.get(URL, params={'id': file_id}, stream=True)
+
+    os.makedirs(os.path.dirname(destination), exist_ok=True)
+    
+    with open(destination, "wb") as f, tqdm(unit='B', unit_scale=True, desc=f"Downloading {os.path.basename(destination)}") as bar:
+        for chunk in response.iter_content(chunk_size=32768):
+            if chunk:
+                f.write(chunk)
+                bar.update(len(chunk))
 
 class MediaForensicsOrchestrator:
     def __init__(self):
+        # 1. Device Detection (CUDA, MPS, or CPU)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
         print(f"--- Orchestrator initializing on: {self.device} ---")
         
-        # Image Preprocessing
+        # 2. Define Weights Configuration
+        # REPLACE the 'id' values with your actual Google Drive File IDs
+        self.checkpoints = {
+            "visual": {
+                "id": "1_1b7ng-ZjAY4ZBRukW4NUeQ_z7yOsMY9", 
+                "path": "models/checkpoints/efficientnet_b4_video_final.pth"
+            },
+            "audio": {
+                "id": "1238Ngl7hB2E6jzUcSVCX_ebQS1ZIHsA4",
+                "path": "models/checkpoints/wav2vec2_audio_final.pth"
+            }
+        }
+
+        # 3. Check and Download Missing Weights
+        for key, info in self.checkpoints.items():
+            if not os.path.exists(info["path"]):
+                print(f"📦 {key} weights missing. Downloading from cloud...")
+                download_from_gdrive(info["id"], info["path"])
+            else:
+                print(f"✅ {key} weights found locally.")
+
+        # 4. Image Preprocessing
         self.img_transform = transforms.Compose([
             transforms.Resize((224, 224)),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
 
-        # Load Visual Model
+        # 5. Load Visual Model
         self.visual_model = AIMediaDetector(pretrained=False)
-        self.visual_model.load_state_dict(torch.load("models/checkpoints/efficientnet_b4_video_final.pth", map_location=self.device))
+        self.visual_model.load_state_dict(torch.load(self.checkpoints["visual"]["path"], map_location=self.device))
         self.visual_model.to(self.device).eval()
 
-        # Load Text Model
+        # 6. Load Text Model
         self.text_detector = AITextDetector()
 
-        # Load Audio Model
+        # 7. Load Audio Model
         self.audio_extractor = AutoFeatureExtractor.from_pretrained("facebook/wav2vec2-base")
         self.audio_model = AutoModelForAudioClassification.from_pretrained("facebook/wav2vec2-base", num_labels=2)
-        self.audio_model.load_state_dict(torch.load("models/checkpoints/wav2vec2_audio_final.pth", map_location=self.device))
+        self.audio_model.load_state_dict(torch.load(self.checkpoints["audio"]["path"], map_location=self.device))
         self.audio_model.to(self.device).eval()
         
         print("--- All Forensic Engines Loaded ---")
@@ -62,14 +117,12 @@ class MediaForensicsOrchestrator:
             return f"Error processing audio: {str(e)}"
 
     def scan_video(self, path, sample_rate=1.0):
-        """Extracts frames from a video and runs the EfficientNet detector."""
         if not os.path.exists(path):
             return f"Error: Video file {path} not found."
 
         cap = cv2.VideoCapture(path)
         fps = cap.get(cv2.CAP_PROP_FPS)
         
-        # Safety: If FPS is 0 or invalid, default to 30
         if fps <= 0:
             fps = 30.0
             
@@ -81,9 +134,7 @@ class MediaForensicsOrchestrator:
             if not ret:
                 break
             
-            # Sample 1 frame per second (or custom sample_rate)
             if frame_count % int(fps / sample_rate) == 0:
-                # Convert OpenCV BGR to PIL RGB
                 img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
                 img_t = self.img_transform(img).unsqueeze(0).to(self.device)
                 
