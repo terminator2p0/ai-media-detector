@@ -21,3 +21,4 @@ datasets
 opencv-python-headless
 Pillow
 scipy
+gdown
