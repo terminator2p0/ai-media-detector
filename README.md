@@ -10,6 +10,9 @@ A production-ready deepfake detection suite designed to identify AI-generated ar
 * **Audio Analysis:** Utilizes **Wav2Vec2-base** to identify synthetic acoustic patterns.
 * **Textual Analysis:** Employs a **RoBERTa-based** transformer (TMR-RoBERTa) to detect LLM-generated text.
 * **Self-Supervised Learning:** Integrated UI to flag errors, which are then used for local model refinement.
+* **Gemini Forensic Agent:** Generates detailed forensic analysis reports explaining *why* media is flagged. Multi-modal cross-referencing for videos (visual + audio).
+* **Dataset Acquisition:** One-command download of training data from HuggingFace (CIFAKE, deepfake-audio, HC3).
+* **SQLite Persistence:** Every scan and audit is logged to `data/forensic.db` — viewable in DB Browser for SQLite.
 * **Hardware Optimized:** Native support for **Apple Silicon (MPS)** and NVIDIA (CUDA).
 
 ---
@@ -18,18 +21,33 @@ A production-ready deepfake detection suite designed to identify AI-generated ar
 
 ```text
 ai-media-detector/
-├── app.py                     # Streamlit Dashboard & Forensic UI
-├── train_feedback.py          # Self-supervised retraining engine
-├── requirements.txt           # Project dependencies
-├── agent/                     # Forensic reasoning logic
-├── configs/                   # Global app & model configurations
-├── data/                      # Data storage
-│   ├── feedback_loop/         # Active training samples (Real/Fake)
-│   └── archive/               # Processed training samples
-├── models/                    
-│   ├── inference_orchestrator.py # Multi-modal model manager
-│   └── checkpoints/           # Model weight storage (.pth files)
-└── .env.example               # Template for environment secrets
+├── app.py                          # Streamlit Dashboard & Forensic UI
+├── db.py                           # SQLite persistence (predictions + feedback)
+├── train_feedback.py               # Fine-tune visual model on user feedback
+├── train_all.py                    # Full training orchestrator (image/audio/text)
+├── requirements.txt
+├── agent/
+│   └── forensic_agent.py           # Gemini-powered forensic reasoning + LangChain agent
+├── configs/
+│   └── training_configs.yaml
+├── data/
+│   ├── forensic.db                 # SQLite DB (auto-created)
+│   ├── feedback_loop/{real,fake}/  # User-audited media for retraining
+│   ├── training/{image,audio,text}/ # Acquired datasets
+│   └── archive/                    # Archived training batches
+├── data_pipeline/
+│   ├── acquire_datasets.py         # Download CIFAKE + audio + HC3 from HuggingFace
+│   ├── audio_dataloader.py
+│   ├── video_dataloader.py
+│   └── ...
+├── models/
+│   ├── inference_orchestrator.py   # Multi-modal model manager
+│   ├── model.py                    # EfficientNet-B4 architecture
+│   ├── text_detector.py            # TMR-RoBERTa wrapper
+│   └── checkpoints/                # Model weights (.pth)
+├── scripts/
+│   └── open_db.py                  # Open forensic.db in DB Browser for SQLite
+└── .env.example
 ```
 
 ---
@@ -51,12 +69,39 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Model Checkpoints
+### 2. API Keys
 
-Place your trained weights in `models/checkpoints/`:
+```bash
+cp .env.example .env
+# Edit .env and add your Google API key (for Gemini forensic reports)
+```
+
+### 3. Model Checkpoints
+
+Place your trained weights in `models/checkpoints/` (auto-downloaded from Google Drive on first run):
 
 * `efficientnet_b4_video_final.pth`
 * `wav2vec2_audio_final.pth`
+
+### 4. Download Training Datasets (optional)
+
+```bash
+python data_pipeline/acquire_datasets.py                 # all modalities
+python data_pipeline/acquire_datasets.py --only image    # just CIFAKE
+python data_pipeline/acquire_datasets.py --only audio    # deepfake audio
+python data_pipeline/acquire_datasets.py --only text     # HC3 corpus
+python data_pipeline/acquire_datasets.py --max-samples 500  # quick test run
+```
+
+### 5. Train Models (optional)
+
+```bash
+python train_all.py                  # train all three models
+python train_all.py --only image     # just the visual model
+python train_all.py --only audio     # just the audio model
+python train_all.py --only text      # just the text model
+python train_all.py --epochs 20      # override epoch count
+```
 
 ---
 
