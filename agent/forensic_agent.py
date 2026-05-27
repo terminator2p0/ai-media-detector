@@ -76,34 +76,53 @@ def generate_forensic_report(
     api_key = _get_api_key()
     if not api_key:
         return (
-            "_Forensic report unavailable — set GOOGLE_API_KEY in .env to enable "
-            "Gemini-powered analysis reports._"
+            "_Forensic report unavailable — add GOOGLE_API_KEY to your Streamlit secrets "
+            "or .env file to enable Gemini-powered analysis reports._"
         )
 
     from langchain_google_genai import ChatGoogleGenerativeAI
-    from langchain_core.messages import SystemMessage, HumanMessage
+    from langchain_core.messages import HumanMessage
 
-    llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
-        google_api_key=api_key,
-        temperature=0.2,
-    )
-
-    user_msg = (
+    # Build prompt as a single human message — Gemini handles system instructions
+    # best when they are included in the human turn rather than as a SystemMessage.
+    full_prompt = (
+        f"{REPORT_SYSTEM_PROMPT}\n\n"
+        f"---\n"
         f"Media type: {media_type}\n"
         f"File: {file_name or 'N/A'}\n"
         f"Scan results: {scan_result}\n"
     )
     if extra_context:
-        user_msg += f"\nAdditional context: {extra_context}\n"
+        full_prompt += f"Additional context: {extra_context}\n"
+    full_prompt += "\nProduce your forensic analysis report now."
 
-    user_msg += "\nProduce your forensic analysis report."
+    # Try models in order from most capable to most available
+    model_candidates = [
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
+    ]
 
-    response = llm.invoke([
-        SystemMessage(content=REPORT_SYSTEM_PROMPT),
-        HumanMessage(content=user_msg),
-    ])
-    return response.content
+    last_error = None
+    for model_name in model_candidates:
+        try:
+            llm = ChatGoogleGenerativeAI(
+                model=model_name,
+                google_api_key=api_key,
+                temperature=0.2,
+                convert_system_message_to_human=True,
+            )
+            response = llm.invoke([HumanMessage(content=full_prompt)])
+            return response.content
+        except Exception as exc:
+            last_error = exc
+            continue
+
+    return (
+        f"_Forensic report generation failed. "
+        f"Check that your GOOGLE_API_KEY has access to Gemini models. "
+        f"Error: {type(last_error).__name__}: {str(last_error)[:200]}_"
+    )
 
 
 # ---------------------------------------------------------------------------
