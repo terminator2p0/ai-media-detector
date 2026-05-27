@@ -22,3 +22,5 @@ opencv-python-headless
 Pillow
 scipy
 gdown
+soundfile
+langchain-core

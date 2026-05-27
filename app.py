@@ -8,6 +8,7 @@ from datetime import datetime
 import streamlit as st
 
 import db
+from agent.forensic_agent import generate_forensic_report, analyze_multimodal
 from models.inference_orchestrator import MediaForensicsOrchestrator
 
 
@@ -184,6 +185,37 @@ if uploaded_file is not None:
             st.metric("Confidence Score", f"{conf}%")
             st.progress(min(max(conf / 100, 0.0), 1.0))
 
+            # --- Gemini forensic report + multi-modal ---
+            report_col1, report_col2 = st.columns(2)
+            with report_col1:
+                if st.button("🔬 Generate Forensic Report"):
+                    with st.spinner("Gemini is analyzing the evidence..."):
+                        report = generate_forensic_report(
+                            scan_result=res,
+                            media_type=file_type,
+                            file_name=st.session_state.last_file_name,
+                        )
+                        st.session_state["forensic_report"] = report
+
+            with report_col2:
+                if file_type == "video" and st.button("🎬 Multi-Modal Scan (Video + Audio)"):
+                    with st.spinner("Cross-referencing visual and audio tracks..."):
+                        mm_result = analyze_multimodal(st.session_state.last_file_path, orchestrator)
+                        st.session_state["multimodal_result"] = mm_result
+
+            if st.session_state.get("forensic_report"):
+                with st.expander("📜 Forensic Report (Gemini)", expanded=True):
+                    st.markdown(st.session_state["forensic_report"])
+
+            if st.session_state.get("multimodal_result"):
+                with st.expander("🎬 Multi-Modal Analysis", expanded=True):
+                    mm = st.session_state["multimodal_result"]
+                    if "combined_verdict" in mm:
+                        v_color = "red" if "AI" in mm["combined_verdict"] or "Deepfake" in mm["combined_verdict"] else "green"
+                        st.markdown(f"**Combined Verdict:** :{v_color}[{mm['combined_verdict']}]")
+                        st.metric("Combined Confidence", f"{mm['combined_confidence']}%")
+                    st.json(mm)
+
             st.write("---")
             st.write("### 🤖 Self-Supervision: Was this correct?")
 
@@ -269,6 +301,18 @@ if st.session_state.last_text_result:
     st.json(st.session_state.last_text_result)
 
     if isinstance(st.session_state.last_text_result, dict) and "error" not in st.session_state.last_text_result:
+        if st.button("🔬 Text Forensic Report", key="text_report"):
+            with st.spinner("Gemini is analyzing the text..."):
+                report = generate_forensic_report(
+                    scan_result=st.session_state.last_text_result,
+                    media_type="text",
+                    extra_context=f"First 200 chars of input: {user_text[:200]}",
+                )
+                st.session_state["text_forensic_report"] = report
+
+        if st.session_state.get("text_forensic_report"):
+            with st.expander("📜 Text Forensic Report (Gemini)", expanded=True):
+                st.markdown(st.session_state["text_forensic_report"])
         if st.session_state.text_feedback_recorded:
             st.success("Feedback recorded.")
         else:
