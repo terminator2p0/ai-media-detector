@@ -24,6 +24,28 @@ from models.inference_orchestrator import MediaForensicsOrchestrator
 LABEL_TO_TARGET = {"fake": 1.0, "real": 0.0}
 
 
+IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv"}
+
+
+def _load_as_image(path: str) -> Image.Image:
+    """Load an image file or extract the middle frame from a video."""
+    ext = os.path.splitext(path)[1].lower()
+    if ext in IMAGE_EXTS:
+        return Image.open(path).convert("RGB")
+    if ext in VIDEO_EXTS:
+        import cv2
+        cap = cv2.VideoCapture(path)
+        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        cap.set(cv2.CAP_PROP_POS_FRAMES, max(total // 2, 0))
+        ret, frame = cap.read()
+        cap.release()
+        if not ret:
+            raise ValueError(f"Could not extract frame from {path}")
+        return Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+    raise ValueError(f"Unsupported file type: {ext}")
+
+
 class FeedbackImageDataset(Dataset):
     def __init__(self, samples: List[Tuple[str, float]], transform):
         self.samples = samples
@@ -34,7 +56,7 @@ class FeedbackImageDataset(Dataset):
 
     def __getitem__(self, idx: int):
         path, target = self.samples[idx]
-        img = Image.open(path).convert("RGB")
+        img = _load_as_image(path)
         return self.transform(img), torch.tensor([target], dtype=torch.float32)
 
 
@@ -60,8 +82,8 @@ def collect_samples_from_filesystem(root: str = "data/feedback_loop") -> List[Tu
             full = os.path.join(d, fname)
             if not os.path.isfile(full):
                 continue
-            # crude image filter
-            if not fname.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".webp")):
+            ext = os.path.splitext(fname)[1].lower()
+            if ext not in IMAGE_EXTS and ext not in VIDEO_EXTS:
                 continue
             samples.append((full, target))
     return samples
