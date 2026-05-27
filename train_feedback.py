@@ -1,104 +1,147 @@
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader
-from torchvision import transforms, datasets
+"""Fine-tune the visual model on user-confirmed feedback samples.
+
+Source of truth: the SQLite feedback table (see db.py). For each feedback row whose
+stored_media_path still exists on disk, we build a (path, label) pair where
+deepfake=1 and authentic=0. We fall back to the legacy ImageFolder layout under
+data/feedback_loop/ if the DB has no rows yet, so older datasets keep working.
+"""
+
 import os
 import shutil
 from datetime import datetime
+from typing import List, Tuple
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from PIL import Image
+from torch.utils.data import DataLoader, Dataset
+
+import db
 from models.inference_orchestrator import MediaForensicsOrchestrator
 
+
+LABEL_TO_TARGET = {"fake": 1.0, "real": 0.0}
+
+
+class FeedbackImageDataset(Dataset):
+    def __init__(self, samples: List[Tuple[str, float]], transform):
+        self.samples = samples
+        self.transform = transform
+
+    def __len__(self) -> int:
+        return len(self.samples)
+
+    def __getitem__(self, idx: int):
+        path, target = self.samples[idx]
+        img = Image.open(path).convert("RGB")
+        return self.transform(img), torch.tensor([target], dtype=torch.float32)
+
+
+def collect_samples_from_db() -> List[Tuple[str, float]]:
+    samples = []
+    for row in db.training_samples():
+        label = row["true_label"]
+        if label not in LABEL_TO_TARGET:
+            continue
+        samples.append((row["stored_media_path"], LABEL_TO_TARGET[label]))
+    return samples
+
+
+def collect_samples_from_filesystem(root: str = "data/feedback_loop") -> List[Tuple[str, float]]:
+    samples = []
+    for label, target in LABEL_TO_TARGET.items():
+        d = os.path.join(root, label)
+        if not os.path.isdir(d):
+            continue
+        for fname in os.listdir(d):
+            if fname.endswith(".json"):
+                continue
+            full = os.path.join(d, fname)
+            if not os.path.isfile(full):
+                continue
+            # crude image filter
+            if not fname.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".webp")):
+                continue
+            samples.append((full, target))
+    return samples
+
+
 def train_on_feedback():
-    # 1. Device Setup (Mac M-series Optimization)
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    device = torch.device(
+        "cuda" if torch.cuda.is_available()
+        else "mps" if torch.backends.mps.is_available()
+        else "cpu"
+    )
     print(f"--- 🧠 Starting Model Refinement on: {device} ---")
 
-    # 2. Initialize Orchestrator and Extract Model
-    # This pulls your current 'EfficientNet' and its existing weights
+    db.init_db()
+
     orchestrator = MediaForensicsOrchestrator()
     model = orchestrator.visual_model
     model.to(device)
-    model.train() 
+    model.train()
 
-    # 3. Data Loading Logic
-    feedback_path = "data/feedback_loop"
-    
-    # Ensure folders exist
-    os.makedirs(os.path.join(feedback_path, "real"), exist_ok=True)
-    os.makedirs(os.path.join(feedback_path, "fake"), exist_ok=True)
-    
-    real_count = len([f for f in os.listdir(os.path.join(feedback_path, "real")) if not f.endswith('.json')])
-    fake_count = len([f for f in os.listdir(os.path.join(feedback_path, "fake")) if not f.endswith('.json')])
-    
-    if (real_count + fake_count) < 1:
-        print("❌ Error: No feedback data found. Mark some mistakes in the app first!")
+    samples = collect_samples_from_db()
+    if samples:
+        print(f"--- Loaded {len(samples)} samples from feedback DB ---")
+    else:
+        samples = collect_samples_from_filesystem()
+        print(f"--- DB empty, loaded {len(samples)} samples from filesystem fallback ---")
+
+    if not samples:
+        print("❌ No feedback data found. Mark some scans in the app first!")
         return
 
-    print(f"--- Found {real_count} Real and {fake_count} Fake feedback samples ---")
+    real_count = sum(1 for _, t in samples if t == 0.0)
+    fake_count = sum(1 for _, t in samples if t == 1.0)
+    print(f"--- Distribution: real={real_count}, fake={fake_count} ---")
 
-    # Use the orchestrator's existing transform for consistency
-    transform = orchestrator.img_transform
-    dataset = datasets.ImageFolder(root=feedback_path, transform=transform)
-    
-    # Batch size of 2 or 4 is best for very small "correction" datasets
+    dataset = FeedbackImageDataset(samples, transform=orchestrator.img_transform)
     loader = DataLoader(dataset, batch_size=2, shuffle=True)
 
-    # 4. Optimizer & Loss
-    # Ultra-low learning rate (1e-6) to fine-tune without "breaking" the model
     optimizer = optim.Adam(model.parameters(), lr=1e-6)
     criterion = nn.BCEWithLogitsLoss()
 
-    # 5. Fine-Tuning Loop
     epochs = 5
     print(f"--- Refinement in progress for {epochs} epochs ---")
-    
     for epoch in range(epochs):
         epoch_loss = 0.0
-        for inputs, labels in loader:
+        for inputs, targets in loader:
             inputs = inputs.to(device)
-            # ImageFolder maps alphabetically: fake=0, real=1.
-            # We flip these to match our model: deepfake=1, authentic=0.
-            target_labels = (1 - labels).float().unsqueeze(1).to(device)
-
+            targets = targets.to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
-            loss = criterion(outputs, target_labels)
+            loss = criterion(outputs, targets)
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
+        print(f"Epoch {epoch + 1}: Loss = {epoch_loss / max(len(loader), 1):.5f}")
 
-        print(f"Epoch {epoch+1}: Loss = {epoch_loss/len(loader):.5f}")
-
-    # 6. Backup Current Model Before Overwriting
     original_path = "models/checkpoints/efficientnet_b4_video_final.pth"
     backup_dir = "models/checkpoints/backups"
     os.makedirs(backup_dir, exist_ok=True)
-    
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_path = os.path.join(backup_dir, f"model_pre_refinement_{timestamp}.pth")
-    
     if os.path.exists(original_path):
         shutil.copy(original_path, backup_path)
         print(f"--- 🛡️ Backup created: {backup_path} ---")
 
-    # 7. Save the Refined Model
     torch.save(model.state_dict(), original_path)
-    print(f"--- ✅ Success: Smarter model saved to {original_path} ---")
+    print(f"--- ✅ Refined model saved to {original_path} ---")
 
-    # 8. Archive the Feedback Data
-    # This prevents training on the same images repeatedly in the future
     archive_root = "data/archive"
     session_archive = os.path.join(archive_root, timestamp)
     os.makedirs(session_archive, exist_ok=True)
-    
-    for category in ['real', 'fake']:
-        cat_path = os.path.join(feedback_path, category)
-        for f in os.listdir(cat_path):
-            src = os.path.join(cat_path, f)
-            dst = os.path.join(session_archive, f)
-            shutil.move(src, dst)
-    
-    print(f"--- 📦 Data archived to {session_archive}. Ready for the next loop! ---")
+    for category in ("real", "fake"):
+        cat_path = os.path.join("data/feedback_loop", category)
+        if not os.path.isdir(cat_path):
+            continue
+        for fname in os.listdir(cat_path):
+            shutil.move(os.path.join(cat_path, fname), os.path.join(session_archive, fname))
+    print(f"--- 📦 Data archived to {session_archive} ---")
+
 
 if __name__ == "__main__":
     train_on_feedback()
