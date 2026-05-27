@@ -71,15 +71,59 @@ streamlit run app.py
 ### 2. The Feedback Loop (Active Learning)
 
 * **Run a Scan:** Upload a suspect file and click "Run Neural Scan".
-* **Audit Result:** If the model makes a mistake, click "❌ No, Incorrect".
-* **Deduplication:** The system calculates an MD5 Hash to prevent duplicate storage.
-* **Refine the Agent:** Once you have a batch of errors, close the app and run:
+* **Audit Result:** Click "✅ Yes, Correct" or "❌ No, Incorrect". Both signals are persisted.
+* **Persistence:** Every scan is logged to a SQLite DB (`data/forensic.db`). Audited media is hashed (MD5), deduplicated, and copied into `data/feedback_loop/{real|fake}/`.
+* **Refine the Agent:** Once you have a batch of audited samples, run:
 
 ```bash
 python train_feedback.py
 ```
 
-This creates a model backup, fine-tunes the weights, and archives the training data.
+This pulls labeled samples from the DB, creates a model backup, fine-tunes the weights, and archives the training data.
+
+### 3. Inspect the Backend
+
+```bash
+python -c "import db, json; print(json.dumps(db.stats(), indent=2))"
+sqlite3 data/forensic.db "SELECT id, file_type, model_prediction, confidence, created_at FROM predictions ORDER BY id DESC LIMIT 10;"
+```
+
+---
+
+## 🗄️ Backend Architecture
+
+The project is currently **local-first** — no external services required.
+
+### Current Setup
+
+| Concern | Implementation |
+| --- | --- |
+| Prediction / feedback storage | **SQLite** (`data/forensic.db`) — see `db.py` |
+| Media storage | Local filesystem under `data/feedback_loop/{real,fake}/` |
+| Model weights | Local filesystem + Google Drive bootstrap via `gdown` |
+| Web UI | Streamlit (`app.py`) |
+| Agent (optional) | LangChain + Gemini 2.5 Flash (`agent/forensic_agent.py`) |
+
+### Recommended Production Path
+
+When you outgrow single-user, single-machine usage:
+
+1. **Database — swap SQLite for PostgreSQL.**
+   Keep the same schema (`predictions`, `feedback`). Use SQLAlchemy + Alembic for migrations. Hosted options: Neon, Supabase, RDS.
+
+2. **Media storage — move off local disk to object storage.**
+   S3-compatible (AWS S3, Cloudflare R2, Backblaze B2). Store the object key in the `stored_media_path` column instead of a local path. Cheap, durable, and survives container restarts.
+
+3. **Split UI from inference — introduce a FastAPI service.**
+   Streamlit becomes one client. The API exposes `/scan`, `/feedback`, `/stats` and owns DB + storage access. This unlocks: mobile clients, batch ingestion, an auth layer, and rate limiting.
+
+4. **Move training off the user's box.**
+   A scheduled job (Modal, Runpod, GitHub Actions + a GPU runner, or Airflow on K8s) pulls labeled samples from Postgres, fine-tunes, and writes a versioned checkpoint to object storage. The orchestrator pulls the latest checkpoint at boot.
+
+5. **Auth + multi-tenancy** (when needed).
+   Add a `users` table, a `user_id` foreign key on `predictions` / `feedback`, and put the FastAPI service behind an auth provider (Clerk, Auth0, or a JWT issuer of your choice).
+
+For your current scale — solo use, single laptop — **SQLite + local filesystem is the right call**. Stay there until something forces the move.
 
 ---
 

@@ -1,6 +1,5 @@
 import os
 from dotenv import load_dotenv
-import streamlit as st
 
 # Standard LangChain v1.0 Imports
 from langchain.agents import create_agent
@@ -15,11 +14,19 @@ load_dotenv()
 orchestrator = MediaForensicsOrchestrator()
 
 # --- 1. SECURE KEY RETRIEVAL ---
-# Check Streamlit secrets first (Cloud), then fall back to os.environ (Local)
-if "GOOGLE_API_KEY" in st.secrets:
-    google_api_key = st.secrets["GOOGLE_API_KEY"]
-else:
-    google_api_key = os.getenv("GOOGLE_API_KEY")
+# Prefer Streamlit secrets when running inside Streamlit; otherwise use env vars.
+google_api_key = os.getenv("GOOGLE_API_KEY")
+try:
+    import streamlit as st
+    if "GOOGLE_API_KEY" in st.secrets:
+        google_api_key = st.secrets["GOOGLE_API_KEY"]
+except Exception:
+    pass
+
+if not google_api_key:
+    raise RuntimeError(
+        "GOOGLE_API_KEY is not set. Add it to .env or Streamlit secrets before running the agent."
+    )
 
 # --- 2. TOOLS ---
 @tool
