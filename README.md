@@ -137,17 +137,74 @@ sqlite3 data/forensic.db "SELECT id, file_type, model_prediction, confidence, cr
 
 ## 🗄️ Backend Architecture
 
-The project is currently **local-first** — no external services required.
+The project supports two database backends — picks automatically based on env vars.
 
 ### Current Setup
 
 | Concern | Implementation |
 | --- | --- |
-| Prediction / feedback storage | **SQLite** (`data/forensic.db`) — see `db.py` |
+| Prediction / feedback storage | **SQLite** local *or* **Turso** (hosted libSQL) — see `db.py` |
 | Media storage | Local filesystem under `data/feedback_loop/{real,fake}/` |
 | Model weights | Local filesystem + Google Drive bootstrap via `gdown` |
 | Web UI | Streamlit (`app.py`) |
 | Agent (optional) | LangChain + Gemini 2.5 Flash (`agent/forensic_agent.py`) |
+
+### Using Turso (recommended for Streamlit Cloud deployments)
+
+Streamlit Cloud wipes the filesystem on every redeploy, so local SQLite won't persist
+when multiple people are using your deployed app. Turso fixes this — hosted libSQL
+with a generous free tier (9 GB).
+
+**1. Set up Turso (one time):**
+
+```bash
+# Install the CLI
+curl -sSfL https://get.tur.so/install.sh | bash
+
+# Sign in (opens browser, uses GitHub)
+turso auth signup     # or: turso auth login
+
+# Create the DB
+turso db create ai-media-detector
+
+# Get the URL and a token
+turso db show ai-media-detector --url    # libsql://...turso.io
+turso db tokens create ai-media-detector # eyJhbGc...
+```
+
+**2. Configure locally:**
+
+```bash
+# Add these to .env
+TURSO_DATABASE_URL=libsql://ai-media-detector-<yourname>.turso.io
+TURSO_AUTH_TOKEN=eyJhbGc...
+```
+
+**3. Configure on Streamlit Cloud:**
+
+In your app's settings → *Secrets*, paste:
+
+```toml
+GOOGLE_API_KEY = "..."
+TURSO_DATABASE_URL = "libsql://..."
+TURSO_AUTH_TOKEN = "eyJ..."
+```
+
+**4. Migrate existing local data (optional):**
+
+```bash
+export TURSO_DATABASE_URL=libsql://...
+export TURSO_AUTH_TOKEN=eyJ...
+python scripts/migrate_to_turso.py
+```
+
+This copies your existing `data/forensic.db` rows to Turso. Safe to re-run — it skips
+duplicates by hash + timestamp.
+
+**5. Browse Turso data:**
+
+Open the Turso web dashboard at <https://app.turso.tech> → your database → *Data*.
+Or use the CLI: `turso db shell ai-media-detector "SELECT * FROM predictions LIMIT 10"`.
 
 ### Recommended Production Path
 
