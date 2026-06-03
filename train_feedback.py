@@ -89,6 +89,26 @@ def collect_samples_from_filesystem(root: str = "data/feedback_loop") -> List[Tu
     return samples
 
 
+def collect_samples() -> List[Tuple[str, float]]:
+    """Union DB + filesystem feedback, deduped by absolute path.
+
+    The DB may hold rows whose media lives elsewhere (or on another machine, e.g.
+    Streamlit Cloud) while local files may not yet be in the DB. We take both and
+    keep only samples whose media actually exists on disk.
+    """
+    seen: set[str] = set()
+    merged: List[Tuple[str, float]] = []
+    for path, target in collect_samples_from_db() + collect_samples_from_filesystem():
+        if not path or not os.path.exists(path):
+            continue
+        ap = os.path.abspath(path)
+        if ap in seen:
+            continue
+        seen.add(ap)
+        merged.append((path, target))
+    return merged
+
+
 def train_on_feedback():
     device = torch.device(
         "cuda" if torch.cuda.is_available()
@@ -104,15 +124,18 @@ def train_on_feedback():
     model.to(device)
     model.train()
 
-    samples = collect_samples_from_db()
-    if samples:
-        print(f"--- Loaded {len(samples)} samples from feedback DB ---")
-    else:
-        samples = collect_samples_from_filesystem()
-        print(f"--- DB empty, loaded {len(samples)} samples from filesystem fallback ---")
+    samples = collect_samples()
+    print(f"--- Loaded {len(samples)} trainable samples (DB + filesystem, deduped) ---")
 
     if not samples:
         print("❌ No feedback data found. Mark some scans in the app first!")
+        return
+
+    real_n = sum(1 for _, t in samples if t == 0.0)
+    fake_n = sum(1 for _, t in samples if t == 1.0)
+    if real_n == 0 or fake_n == 0:
+        print(f"⚠️  Refusing to train: data is single-class (real={real_n}, fake={fake_n}).")
+        print("    Training on one class biases the model. Add the missing class first.")
         return
 
     real_count = sum(1 for _, t in samples if t == 0.0)
